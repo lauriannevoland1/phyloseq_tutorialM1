@@ -1,2 +1,2 @@
 # phyloseq_tutorialM1
-CE REPOS EST LE RESULTAT DU TUTORIAL phyloseq 
+Ce repos est le résultat du tutoriel de dada2 avec l'analyse par phyloseq de Laurianne Voland 
