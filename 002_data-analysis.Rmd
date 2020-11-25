@@ -1,0 +1,279 @@
+---
+title: "Dada2 tutorial"
+output:
+  pdf_document: default
+  html_notebook: default
+  word_document: default
+---
+```{r}
+library("dada2")
+```
+
+
+```{r}
+path <- "~/MiSeq_SOP" # CHANGE ME to the directory containing the fastq files after unzipping.
+list.files(path)
+```
+
+
+```{r}
+# Forward and reverse fastq filenames have format: SAMPLENAME_R1_001.fastq and SAMPLENAME_R2_001.fastq
+fnFs <- sort(list.files(path, pattern="_R1_001.fastq", full.names = TRUE))
+fnRs <- sort(list.files(path, pattern="_R2_001.fastq", full.names = TRUE))
+# Extract sample names, assuming filenames have format: SAMPLENAME_XXX.fastq
+sample.names <- sapply(strsplit(basename(fnFs), "_"), `[`, 1)
+```
+
+```{r}
+plotQualityProfile(fnFs[1:2])
+```
+
+
+```{r}
+plotQualityProfile(fnRs[1:4])
+```
+
+```{r}
+plotQualityProfile(fnRs[c(1,4)])
+```
+
+```{r}
+# Place filtered files in filtered/ subdirectory
+filtFs <- file.path(path, "filtered", paste0(sample.names, "_F_filt.fastq.gz"))
+filtRs <- file.path(path, "filtered", paste0(sample.names, "_R_filt.fastq.gz"))
+names(filtFs) <- sample.names
+names(filtRs) <- sample.names
+```
+
+
+```{r}
+out <- filterAndTrim(fnFs, filtFs, fnRs, filtRs, truncLen=c(240,160),
+              maxN=0, maxEE=c(2,2), truncQ=2, rm.phix=TRUE,
+              compress=TRUE, multithread=TRUE) # On Windows set multithread=FALSE
+head(out)
+```
+
+#apprentissage des erreurs :
+
+Dada2 inspecte les séquences et calcul un modèle d'erreur a partir des données de séquençage. On applique cette méthode sur les reads Fowards et reverse. Le premier code pour les Fowards( F) et le deuxième pour les reverses (R)
+errF : crée une variable 
+errR : crée une variable 
+```{r}
+errF <- learnErrors(filtFs, multithread=TRUE)
+```
+
+```{r}
+errR <- learnErrors(filtRs, multithread=TRUE)
+```
+visualitaion des modèles d'erreur du foward 
+En diagonale que a donne un a : pas de mutation dans le premier image 
+x: probablité 
+y: Qsocre
+proba de mutation en fonction du Qscore 
+Q40 : la proba reste a est forte 
+autre courbe proba de d'erreur de séquençage que a soit changer en C , le modèle donne une probas en fontion du score de qualité. 
+un score faible Q10 , un a donne un c elle est plus élevé
+```{r}
+plotErrors(errF, nominalQ=TRUE)
+```
+
+appliquer le modèle d'erreur pour changer DADA2  identier les poisiton avec forte probas erreur eeet changer en le nt le plus probable , qui ressemeble plus a la séquence majoritaire proche abondande
+
+Nouvelle variable dadaFS appliquer les modèles d'erreurs
+un jeu de donner avec 10 séquence , regarde , il y a 1 séquence présente 2 fois et une autre présent 8 fois 
+donc 2 séquences unique , autre que redondance 
+1 : 7113 read , de read unique 1979 
+
+obcjet dada Fs : plein etagère , plein d'info , abondance séquence , séquences...
+ex : data fram : 128 de 11 variable , plein d'info
+
+```{r}
+dadaFs <- dada(filtFs, err=errF, multithread=TRUE)
+```
+Aplliquer au donner Reverse
+```{r}
+dadaRs <- dada(filtRs, err=errR, multithread=TRUE)
+```
+une fois modèle appliquer au donnée elles-même , la fonction dada a crée objet de la classe dada ( plein d'autre classe vecteurs...)
+
+inscpecter la première étagère de l'object dada
+dada [1] : info de la première séquence 
+dade [2] : info de la deuxième séquence
+
+```{r}
+dadaFs[[1]]
+```
+```{r}
+dadaFs[[2]]
+```
+
+```{r}
+dadaFs[[3]]
+```
+
+il a regarder 1477 séquence et corrgier les séquence dont il pensait erreur , il trouve 97 unique , 97 variant
+
+La différence avec OTU 
+il corrige erreur séquençage , met ensemble des séquence indentique , 97 vrai variant de 16S , la diff = erreur de séquençage, venue se mettre avec la séquence parents
+
+
+
+# Aligner les R1 et R2 en contigs
+Faire des contigs avec les read 1 et 2 
+
+posssible car amplification du V4 de l'ARN 16S il y a overlap avec read1 et read2 
+
+fonction merge 
+verbose : montrer les étape avec du texte pendant qu'elle sont réalisé 
+regarde la première ligne 
+```{r}
+mergers <- mergePairs(dadaFs, filtFs, dadaRs, filtRs, verbose=TRUE)
+# Inspect the merger data.frame from the first sample
+head(mergers[[1]])
+```
+
+#Construire table obersavation 
+
+en partant de l'abondance , on crée la table a partire de merger
+
+on a crée un objet seqtab, une tablea avec en ligne le nob échantillon ,en colone les séquence elle-meême à l'intérieur ou on observer la séquence dans l'échantillon 
+
+```{r}
+seqtab <- makeSequenceTable(mergers)
+dim(seqtab)
+```
+
+
+Regarde les distributions des longeur des séquences
+on applique la fonction de dada2 getSequences , il va calculer combien il y a de cractéère dans chaque séquence 
+Dans seq table j ai un séquence de 251 nt ...
+Rien de abérants
+
+```{r}
+# Inspect distribution of sequence lengths
+table(nchar(getSequences(seqtab)))
+```
+
+#Les chimère 
+pendant  l'amplification pendant PCR, en théorie amplifier avec les primres 
+Avec le primers F, on crée le complémentaire , mais  pour x ou y , l'élongation s'arrete 
+on aura le 16S  qui n'aura pas bouger et un autre fragement sb plus court , le cycle d'apres de PCR , on va avoir un des fragment 16S ( le rouge et l'incomplet) qui vont s'hydrider sur un autre fragement 16S comme un primer  et donc continuer élongation (verte) pour donner un truc hybrides a la fin qui sera le début du rouge et a la fin du vert
+c'est rare , mais quand plein de séquence possible  et il faut les enlever du jeu de données 
+pas possible de détecter car la même taille que les autres
+
+Il va regarder toutes les séquences rare dont le début correspond a une séquence parent dans le meme jeu donnée et la fin d'une autre séquence parents
+appliquer a seqtab 
+et transferer a une la nouvelle variable seqtab.nochim
+
+-> 1/5 , les 293 unique mais qui represente plus de séquence dans le jeu de donnée 
+
+```{r}
+seqtab.nochim <- removeBimeraDenovo(seqtab, method="consensus", multithread=TRUE, verbose=TRUE)
+dim(seqtab.nochim)
+```
+
+Calculer le ration , le percentage de séquence chimérique dans la table 
+la somme de seqtabl : ensemble des abaoncdance relative de chacune des échantilon 
+
+```{r}
+sum(seqtab.nochim)/sum(seqtab)
+```
+```{r}
+1-sum(seqtab.nochim)/sum(seqtab)
+```
+il y a 3,5 % de séquence chimériques dans notre jeu de données 
+
+Souvent un taux de détection de chimère , il avait laisser dans leur jeu de donné la séquence des primers , aug le nombre de chimère car il est commun a tt les séquence et varie apres. Les séquence plus les primer utilisé pour amplification 
+
+
+# résultat des filtre de qualité 
+construre une table pour suivre le nombre de séquence enelver a chaque étape de bio info 
+
+object getN , qui est fonction de x qui est la somme de getUniques 
+Avec R on peut crée nouvelle fonctions
+nouvelle variable cbind : concaténer plusieur valeur : out ( le nombre de reas apres le filtre qualiré) + appliquer chaque ligne getN pour les dada 
+get uniques : extrait les séquence uniques d'u objet dada 
+
+la somme des ligne de la table seqtable sans chimère 
+table trac : conconténation
+somme des observation pour chacun des obs
+
+```{r}
+getN <- function(x) sum(getUniques(x))
+track <- cbind(out, sapply(dadaFs, getN), sapply(dadaRs, getN), sapply(mergers, getN), rowSums(seqtab.nochim))
+# If processing a single sample, remove the sapply calls: e.g. replace sapply(dadaFs, getN) with getN(dadaFs)
+colnames(track) <- c("input", "filtered", "denoisedF", "denoisedR", "merged", "nonchim")
+rownames(track) <- sample.names
+head(track)
+```
+évolution du nombre de séquence à chaque opération 
+on est partie de 7793 pour arriver a 6539 contigs 
+
+
+c= valeut définir dans le vecteur 
+cbind = n'importe quoi , déectecter la nature des object
+
+#Assigantion taxonomie 
+
+pour assigner il faut 2 chose: un algo et une base de ref 
+assigenur dans dade2 : regarder dans une base de donnée qui ont des taxo 
+il faut base de donnée ref ( Green genes ou silva) choisi silva 138
+ici du bash pas du R 
+
+```{bash}
+wget https://zenodo.org/record/3986799/files/silva_nr99_v138_train_set.fa.gz
+```
+
+Assignation taxo 
+s'appliquer sur seqtable avec pas les chimère 
+
+```{r}
+taxa <- assignTaxonomy(seqtab.nochim, "~/silva_nr99_v138_train_set.fa.gz", multithread=TRUE)
+```
+
+Avoir l'affichage 
+```{r}
+taxa.print <- taxa # Removing sequence rownames for display only
+rownames(taxa.print) <- NULL
+head(taxa.print)
+```
+
+```{bash}
+wget https://zenodo.org/record/3986799/files/silva_species_assignment_v138.fa.gz
+```
+
+
+
+```{r}
+taxa <- addSpecies(taxa, "~/silva_species_assignment_v138.fa.gz")
+```
+
+
+```{r}
+taxa.print <- taxa # Removing sequence rownames for display only
+rownames(taxa.print) <- NULL
+head(taxa.print)
+```
+
+
+
+```{r}
+if (!requireNamespace("BiocManager", quietly=TRUE))
+    install.packages("BiocManager")
+BiocManager::install("DECIPHER")
+```
+
+
+```{r}
+library(DECIPHER); packageVersion("DECIPHER")
+```
+
+
+
+
+```{r}
+unqs.mock <- seqtab.nochim["Mock",]
+unqs.mock <- sort(unqs.mock[unqs.mock>0], decreasing=TRUE) # Drop ASVs absent in the Mock
+cat("DADA2 inferred", length(unqs.mock), "sample sequences present in the Mock community.\n")
+```
+
