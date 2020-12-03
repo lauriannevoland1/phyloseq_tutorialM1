@@ -1,15 +1,17 @@
 ---
 title: "01_data-import"
 output: 
-  html_notebook:
-    df_print : paged
+  github_document: 
+   toc: yes
+   toc_depth: 5
 ---
-Importation des données MiSeqSOP du site Mothur :
+
+# Importation des données MiSeqSOP du site Mothur :
 ```{bash}
 wget https://mothur.s3.us-east-2.amazonaws.com/wiki/miseqsopdata.zip
 ```
 
-Dézipage des données de MiSeq : 
+# Dézipage des données de MiSeq : 
 ```{bash}
 unzip miseqsopdata.zip
 ```
@@ -17,9 +19,10 @@ unzip miseqsopdata.zip
 Les fichiers fastq ont été générés par le séquençage en amplicon 2x250 d' Illumina Miseq de la région V4 du gène de l'ARNr 16S à partir d'échantillons d'intestin prélevés longitudinalement sur une souris après le sevrage. 
 
 
-pour assigner il faut 2 chose: un algo et une base de ref 
-assigenur dans dade2 : regarder dans une base de donnée qui ont des taxo 
-il faut base de donnée ref ( Green genes ou silva) choisi silva 138
+# Donnée de la base de référence de sliva pour l'assignation taxonomique
+Pour assigner il faut 2 choses: un algorithme et une base de reférence 
+Il existe un assigenur dans dada2 : regarder dans une base de donnée qui ont des taxo 
+il faut base de donnée reférence ( Green genes ou silva) choisi silva 138
 ici du bash pas du R 
 
 ```{bash}
@@ -27,7 +30,7 @@ wget https://zenodo.org/record/3986799/files/silva_nr99_v138_train_set.fa.gz
 ```
 
 
-
+# Donnée de la base de référence de sliva pour l'assignation taxonomique des espèces 
 ```{bash}
 wget https://zenodo.org/record/3986799/files/silva_species_assignment_v138.fa.gz
 ```
